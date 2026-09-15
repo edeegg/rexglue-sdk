@@ -158,6 +158,17 @@ class WindowedApp {
     return it != creators_->end() ? it->second : nullptr;
   }
 
+  // Every rexglue_setup_target() project links exactly one REX_DEFINE_APP
+  // into its executable/shared library, so the windowed app entry point
+  // doesn't need to know the app's identifier string to find it.
+  static Creator GetSoleCreator() {
+    if (!creators_ || creators_->size() != 1) {
+      assert_always();
+      return nullptr;
+    }
+    return creators_->begin()->second;
+  }
+
  private:
   static std::unordered_map<std::string, Creator>* creators_;
 #endif  // XE_UI_WINDOWED_APPS_IN_LIBRARY

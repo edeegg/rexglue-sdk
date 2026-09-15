@@ -147,3 +147,17 @@ inline constexpr char kPathSeparator = '/';
 #endif  // REX_PLATFORM_WIN32
 
 }  // namespace rex::platform
+
+#if REX_PLATFORM_ANDROID
+#include <android/api-level.h>
+
+namespace rex {
+
+// The running device's API level, for gating dlopen()'d APIs that only exist
+// on newer Android versions than the app's compile-time minSdkVersion.
+inline int GetAndroidApiLevel() {
+  return android_get_device_api_level();
+}
+
+}  // namespace rex
+#endif  // REX_PLATFORM_ANDROID

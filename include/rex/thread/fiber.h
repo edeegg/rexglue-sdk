@@ -20,12 +20,33 @@
 // before including <ucontext.h>.
 #define _XOPEN_SOURCE 700
 #endif
+#if !REX_PLATFORM_ANDROID
 #include <ucontext.h>
+#endif
 #include <cstdint>
 #include <vector>
 #endif
 
 namespace rex::thread {
+
+#if REX_PLATFORM_ANDROID
+// Bionic never implemented the active context-switching functions (only the
+// passive struct used by signal delivery, via its own <ucontext.h>/
+// <sys/ucontext.h> -- left untouched at global scope for e.g. signal
+// handlers elsewhere), so these are backed by github.com/kaniini/libucontext
+// instead. Declared inside this namespace, rather than globally, so
+// ucontext_t/sigcontext/getcontext can't collide with Bionic's own
+// declarations of the same names visible elsewhere in the same translation
+// unit; unqualified lookup from within rex::thread finds these first.
+#include <libucontext/bits.h>
+using ucontext_t = libucontext_ucontext_t;
+extern "C" {
+int getcontext(ucontext_t* ucp);
+int setcontext(const ucontext_t* ucp);
+void makecontext(ucontext_t* ucp, void (*func)(), int argc, ...);
+int swapcontext(ucontext_t* oucp, const ucontext_t* ucp);
+}
+#endif  // REX_PLATFORM_ANDROID
 
 /// Host OS fiber primitive.
 /// Each guest fiber gets one Fiber. Switching preserves the entire C++ call

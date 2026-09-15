@@ -100,6 +100,13 @@ target_include_directories(rexcore PRIVATE
 
 if(APPLE)
     target_link_libraries(rexcore PRIVATE pthread)
+elseif(ANDROID)
+    # pthread and rt are built into Bionic libc directly; there are no
+    # separate libpthread.so/librt.so to link against.
+    target_link_libraries(rexcore PRIVATE dl)
+    # filesystem_posix.cpp bridges content:// URIs to a native fd via JNI,
+    # using SDL_GetAndroidJNIEnv()/SDL_GetAndroidActivity().
+    target_link_libraries(rexcore PRIVATE SDL3::SDL3)
 elseif(UNIX)
     target_link_libraries(rexcore PRIVATE pthread rt dl)
 endif()

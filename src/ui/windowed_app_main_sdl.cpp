@@ -55,7 +55,8 @@ int RunWindowedApp(int argc, char** argv) {
     }
 #endif
 
-    std::unique_ptr<rex::ui::WindowedApp> app = rex::ui::GetWindowedAppCreator()(app_context);
+    std::unique_ptr<rex::ui::WindowedApp> app =
+        rex::ui::WindowedApp::GetSoleCreator()(app_context);
 
     // Match remaining positional args to the app's expected options.
     const auto& option_names = app->GetPositionalOptions();

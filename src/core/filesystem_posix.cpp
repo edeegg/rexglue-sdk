@@ -27,8 +27,15 @@
 #include <rex/assert.h>
 #include <rex/filesystem.h>
 #include <rex/logging.h>
+#include <rex/platform.h>
 #include <rex/platform/env.h>
 #include <rex/string.h>
+
+#if REX_PLATFORM_ANDROID
+#include <jni.h>
+
+#include <SDL3/SDL.h>
+#endif
 
 #include <dirent.h>
 #include <ftw.h>
@@ -301,6 +308,63 @@ std::vector<FileInfo> ListFiles(const std::filesystem::path& path) {
   closedir(dir);
   return result;
 }
+
+#if REX_PLATFORM_ANDROID
+// Bridges a content:// URI (from the Storage Access Framework, e.g. a folder
+// the user picked directly instead of copying into app storage) to a raw
+// native file descriptor via ContentResolver.openFileDescriptor(), since
+// content:// URIs have no path open()/fopen() can use directly.
+int OpenAndroidContentFileDescriptor(const std::string_view uri, const char* mode) {
+  JNIEnv* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+  jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+  if (!env || !activity) {
+    return -1;
+  }
+
+  auto failed = [env]() {
+    if (!env->ExceptionCheck()) {
+      return false;
+    }
+    env->ExceptionDescribe();
+    env->ExceptionClear();
+    return true;
+  };
+
+  jstring uri_string = env->NewStringUTF(std::string(uri).data());
+  jclass uri_class = env->FindClass("android/net/Uri");
+  jmethodID parse_method =
+      env->GetStaticMethodID(uri_class, "parse", "(Ljava/lang/String;)Landroid/net/Uri;");
+  jobject parsed_uri = env->CallStaticObjectMethod(uri_class, parse_method, uri_string);
+
+  jclass activity_class = env->GetObjectClass(activity);
+  jmethodID get_content_resolver_method = env->GetMethodID(
+      activity_class, "getContentResolver", "()Landroid/content/ContentResolver;");
+  jobject content_resolver = env->CallObjectMethod(activity, get_content_resolver_method);
+
+  if (failed() || !parsed_uri || !content_resolver) {
+    return -1;
+  }
+
+  jclass content_resolver_class = env->GetObjectClass(content_resolver);
+  jmethodID open_fd_method =
+      env->GetMethodID(content_resolver_class, "openFileDescriptor",
+                        "(Landroid/net/Uri;Ljava/lang/String;)Landroid/os/ParcelFileDescriptor;");
+  jstring mode_string = env->NewStringUTF(mode);
+  jobject parcel_fd =
+      env->CallObjectMethod(content_resolver, open_fd_method, parsed_uri, mode_string);
+  if (failed() || !parcel_fd) {
+    return -1;
+  }
+
+  jclass parcel_fd_class = env->GetObjectClass(parcel_fd);
+  jmethodID detach_fd_method = env->GetMethodID(parcel_fd_class, "detachFd", "()I");
+  jint file_descriptor = env->CallIntMethod(parcel_fd, detach_fd_method);
+  if (failed()) {
+    return -1;
+  }
+  return static_cast<int>(file_descriptor);
+}
+#endif  // REX_PLATFORM_ANDROID
 
 }  // namespace filesystem
 }  // namespace rex

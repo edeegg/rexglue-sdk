@@ -259,8 +259,15 @@ add_subdirectory(src/audio)
 add_subdirectory(src/graphics)
 add_subdirectory(src/system)
 add_subdirectory(src/kernel)
-add_subdirectory(src/codegen)
-add_subdirectory(src/rexglue)
+# rexcodegen/rexglue are the host-side codegen CLI tool: only src/rexglue and
+# tests/unit consume rexcodegen, never the runtime itself. When cross-
+# compiling for Android there's no way to run an Android binary as part of
+# the host build anyway, so REXGLUE_CODEGEN_EXECUTABLE always points at a
+# prebuilt host tool instead -- skip cross-compiling this one for Android.
+if(NOT ANDROID)
+    add_subdirectory(src/codegen)
+    add_subdirectory(src/rexglue)
+endif()
 
 # Add tests subdirectory if tests are enabled
 if(REXGLUE_BUILD_TESTS)
