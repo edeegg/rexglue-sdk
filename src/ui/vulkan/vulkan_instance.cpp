@@ -9,8 +9,11 @@
  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
  */
 
+#include <cstdlib>
+#include <filesystem>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -23,6 +26,11 @@
 
 #if REX_PLATFORM_MAC
 #include "vulkan_moltenvk.h"
+#endif
+
+#if REX_PLATFORM_ANDROID && defined(REX_HAS_ADRENOTOOLS)
+#include <adrenotools/driver.h>
+#include <dlfcn.h>
 #endif
 
 REXCVAR_DEFINE_BOOL(vulkan_log_debug_messages, true, "UI/Vulkan", "Log Vulkan debug messages");
@@ -75,7 +83,43 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
     return nullptr;
   }
 #else
-  loader_loaded = vulkan_instance->loader_.Load(platform::lib_names::kVulkanLoader);
+#if REX_PLATFORM_ANDROID && defined(REX_HAS_ADRENOTOOLS)
+  // Rootless per-app custom Vulkan driver loading (Adreno/Turnip "Turnip"
+  // ICDs distributed as ADPKG/zip packages). The driver is supplied by the
+  // user at runtime and is never bundled with the app; see
+  // rex::platform::DynamicLibrary::Adopt() for why a plain dlopen() cannot do
+  // this on Android (linker namespace + SELinux restrictions on unprivileged
+  // apps prevent loading a vendor driver .so directly).
+  const char* custom_driver_dir = std::getenv("REXGLUE_VULKAN_DRIVER_DIR");
+  const char* custom_driver_name = std::getenv("REXGLUE_VULKAN_DRIVER_NAME");
+  const char* native_library_dir = std::getenv("REXGLUE_NATIVE_LIBRARY_DIR");
+  const char* internal_files_dir = std::getenv("REXGLUE_INTERNAL_FILES_DIR");
+  if (custom_driver_dir && custom_driver_dir[0] && custom_driver_name && custom_driver_name[0] &&
+      native_library_dir && native_library_dir[0] && internal_files_dir && internal_files_dir[0]) {
+    const std::filesystem::path driver_path =
+        std::filesystem::path(custom_driver_dir) / custom_driver_name;
+    std::error_code driver_file_error;
+    if (std::filesystem::is_regular_file(driver_path, driver_file_error)) {
+      void* custom_loader = adrenotools_open_libvulkan(
+          RTLD_NOW, ADRENOTOOLS_DRIVER_CUSTOM, internal_files_dir, native_library_dir,
+          custom_driver_dir, custom_driver_name, nullptr, nullptr);
+      if (custom_loader) {
+        vulkan_instance->loader_.Adopt(custom_loader);
+        loader_loaded = true;
+        REXLOG_INFO("Android custom Vulkan loader opened for {}", custom_driver_name);
+      } else {
+        REXLOG_ERROR("Custom Vulkan driver loader failed; falling back to the system driver");
+      }
+    } else {
+      REXLOG_ERROR(
+          "Custom Vulkan driver file is unavailable ({}); falling back to the system driver",
+          driver_file_error ? driver_file_error.message() : "not a regular file");
+    }
+  }
+#endif
+  if (!loader_loaded) {
+    loader_loaded = vulkan_instance->loader_.Load(platform::lib_names::kVulkanLoader);
+  }
   if (!loader_loaded) {
     REXLOG_ERROR("Failed to load {}", platform::lib_names::kVulkanLoader);
     return nullptr;

@@ -31,6 +31,11 @@ bool DynamicLibrary::Load(const std::filesystem::path& path, SymbolResolution /*
   return handle_ != nullptr;
 }
 
+void DynamicLibrary::Adopt(void* handle) {
+  Close();
+  handle_ = handle;
+}
+
 void DynamicLibrary::Close() {
   if (handle_) {
     FreeLibrary(static_cast<HMODULE>(handle_));

@@ -31,6 +31,9 @@ class DynamicLibrary {
   DynamicLibrary& operator=(DynamicLibrary&& other) noexcept;
 
   bool Load(const std::filesystem::path& path, SymbolResolution mode = SymbolResolution::kLazy);
+  // Takes ownership of a platform dlopen/LoadLibrary handle obtained outside
+  // of Load(), e.g. from adrenotools_open_libvulkan().
+  void Adopt(void* handle);
   void Close();
   explicit operator bool() const { return handle_ != nullptr; }
 
