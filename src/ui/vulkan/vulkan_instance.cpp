@@ -90,10 +90,10 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
   // rex::platform::DynamicLibrary::Adopt() for why a plain dlopen() cannot do
   // this on Android (linker namespace + SELinux restrictions on unprivileged
   // apps prevent loading a vendor driver .so directly).
-  const char* custom_driver_dir = std::getenv("REXGLUE_VULKAN_DRIVER_DIR");
-  const char* custom_driver_name = std::getenv("REXGLUE_VULKAN_DRIVER_NAME");
-  const char* native_library_dir = std::getenv("REXGLUE_NATIVE_LIBRARY_DIR");
-  const char* internal_files_dir = std::getenv("REXGLUE_INTERNAL_FILES_DIR");
+  const char* custom_driver_dir = std::getenv("RAYMAN_ORIGINS_VULKAN_DRIVER_DIR");
+  const char* custom_driver_name = std::getenv("RAYMAN_ORIGINS_VULKAN_DRIVER_NAME");
+  const char* native_library_dir = std::getenv("RAYMAN_ORIGINS_NATIVE_LIBRARY_DIR");
+  const char* internal_files_dir = std::getenv("RAYMAN_ORIGINS_INTERNAL_FILES_DIR");
   if (custom_driver_dir && custom_driver_dir[0] && custom_driver_name && custom_driver_name[0] &&
       native_library_dir && native_library_dir[0] && internal_files_dir && internal_files_dir[0]) {
     const std::filesystem::path driver_path =
